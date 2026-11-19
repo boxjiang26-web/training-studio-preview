@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!package*.json
+!*.tsx
+!server.mjs
+!exercise-media.mjs
+!catalog.json
+!index.html
+!style.css
+!preview-access.mjs

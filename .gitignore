@@ -1,0 +1,9 @@
+node_modules/
+data/
+server.err
+server.log
+app.js
+acceptance*.json
+.env*
+*.sqlite*
+*.log

@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@playwright/test": "^1.65.1",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "name": "training-studio",
+  "private": "true",
+  "scripts": {
+    "build": "esbuild app.tsx --bundle --outfile=app.js --minify",
+    "start": "node server.mjs"
+  }
+}

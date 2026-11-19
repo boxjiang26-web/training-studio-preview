@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: training-studio-preview
+    runtime: docker
+    plan: starter
+    branch: main
+    autoDeployTrigger: commit
+    healthCheckPath: /healthz
+    disk:
+      name: training-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PREVIEW_PRIVATE
+        value: "1"
+      - key: PREVIEW_PASSWORD
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data/studio
