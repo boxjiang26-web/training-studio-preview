@@ -1,3 +1,6 @@
+import {publishedWeeks} from './cycles.mjs';
+import {messageSchema,messages} from './messages.mjs';
+import {coachSchema,coachTools} from './coach-tools.mjs';
 import { allowPreview } from './preview-access.mjs';
 import { serveGif } from './exercise-media.mjs';
 import http from 'node:http';
@@ -28,6 +31,7 @@ CREATE TABLE IF NOT EXISTS drafts(owner INTEGER NOT NULL, day TEXT NOT NULL, rev
 CREATE TABLE IF NOT EXISTS plans(id SERIAL PRIMARY KEY, owner INTEGER NOT NULL, day TEXT NOT NULL, rev INTEGER NOT NULL, items JSONB NOT NULL, UNIQUE(owner, day, rev));
 CREATE TABLE IF NOT EXISTS feedback(id TEXT PRIMARY KEY, plan INTEGER UNIQUE NOT NULL, rpe INTEGER NOT NULL, note TEXT NOT NULL, sets JSONB NOT NULL);`);
 
+await pool.query(coachSchema+messageSchema(true));
 async function api(url, body, owner, isPost) {
   const route = url.pathname;
   if (route === '/api/trial' && isPost) {
@@ -39,7 +43,19 @@ async function api(url, body, owner, isPost) {
     return { token };
   }
   check(owner !== undefined, '请刷新试验页面', 401);
-  if (route === '/api/me' && !isPost) return { coach: owner === 0, name: owner === 0 ? '教练' : (await one('SELECT name FROM students WHERE id=?', owner)).name, moves, students: owner === 0 ? await all('SELECT id,name FROM students ORDER BY id DESC') : [] };
+ if(route==='/api/cycle-weeks'&&!isPost)return publishedWeeks(all,owner);
+ if(route.startsWith('/api/messages/'))return messages({one,all,run},url,body,owner,isPost);
+ if(['/api/coach/ai/generate','/api/coach/cycle/generate'].includes(route)&&isPost)return coachTools({one,all,run},route,body,url,isPost,owner);
+  if(route.startsWith('/api/coach/')){
+    const client=await pool.connect();
+    const execute=(text,...values)=>{let n=0;return client.query(text.replace(/\?/g,()=>'$'+(++n)),values)};
+    try{
+      await client.query('BEGIN');
+      const result=await coachTools({run:execute,one:async(...args)=>(await execute(...args)).rows[0],all:async(...args)=>(await execute(...args)).rows},route,body,url,isPost,owner);
+      await client.query('COMMIT');return result;
+    }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
+  }
+  if (route === '/api/me' && !isPost) return { studentId:owner, coach: owner === 0, name: owner === 0 ? '教练' : (await one('SELECT name FROM students WHERE id=?', owner)).name, moves, students: owner === 0 ? await all('SELECT id,name FROM students ORDER BY id DESC') : [] };
   if (route === '/api/students' && isPost) {
     check(owner === 0, '仅教练可用', 403);
     const name = String(body.name || '').trim(); check(name && name.length <= 60, '请输入学员姓名');
@@ -92,7 +108,7 @@ const server = http.createServer(async (req, res) => { try {
   const preview = /^\/exercise-preview\/(ready-ex-[0-9]+)\.gif$/.exec(u.pathname); if (preview && req.method === 'GET') { await serveGif(byId.get(preview[1]), process.env.DATA_DIR || root, res); return; }
   if (!u.pathname.startsWith('/api/')) { const file = { '/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css' }[u.pathname]; check(typeof file === 'string', '页面不存在', 404); res.setHeader('Content-Type', ({ 'index.html': 'text/html; charset=utf-8', 'app.js': 'text/javascript', 'style.css': 'text/css' })[file]); res.end(fs.readFileSync(path.join(root, file))); return; }
   res.setHeader('Content-Type', 'application/json; charset=utf-8'); const post = req.method === 'POST'; check(post || req.method === 'GET', '请求方式无效', 405);
-  let body = {}; if (post) { check(req.headers['content-type'] === 'application/json', '请求格式无效', 415); const parts = []; for await (const chunk of req) parts.push(chunk); body = JSON.parse(Buffer.concat(parts).toString() || '{}'); }
+  let body = {}; if (post) { check(req.headers['content-type'] === 'application/json', '请求格式无效', 415); const parts = []; let size=0;for await (const chunk of req){ size+=chunk.length;check(size<=(u.pathname.startsWith('/api/coach/assessments/')?320000:65536),'请求过大',413);parts.push(chunk); } body = JSON.parse(Buffer.concat(parts).toString() || '{}'); }
   const token = String(req.headers['x-studio-session'] || ''); const owner = (await one('SELECT owner FROM sessions WHERE token=? AND expires>?', hash(token), Date.now()))?.owner;
   res.end(JSON.stringify(await api(u, body, owner, post)));
 } catch (error) { res.statusCode = error.status || 500; res.end(JSON.stringify({ error: error.status ? error.message : '请求处理失败' })); } });

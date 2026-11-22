@@ -1,3 +1,6 @@
+import {publishedWeeks} from './cycles.mjs';
+import {messageSchema,messages} from './messages.mjs';
+import {coachSchema,coachTools} from './coach-tools.mjs';
 import {allowPreview} from './preview-access.mjs';
 import {serveGif} from './exercise-media.mjs';
 import http from 'node:http';
@@ -23,7 +26,8 @@ const moves=['徒手深蹲','髋部拉伸','俯卧撑','平板支撑','弹力带
 const catalog=JSON.parse(fs.readFileSync(path.join(root,'catalog.json'),'utf8'));
 const byId=new Map(catalog.map(row=>[row.id,row]));
 const catalogNames=new Set(catalog.map(row=>row.name));
-function api(url,b,owner,isPost,res){
+db.exec(coachSchema+messageSchema());
+async function api(url,b,owner,isPost,res){
  const route=url.pathname;
  if(route==='/api/trial'&&isPost){
  const id=b.student??0;
@@ -33,7 +37,15 @@ function api(url,b,owner,isPost,res){
  run('INSERT INTO sessions VALUES(?,?,?)',hash(token),id,Date.now()+7*86400000);
  return {token};}
  check(owner!==undefined,'请刷新试验页面',401);
- if(route==='/api/me'&&!isPost)return {coach:owner===0,name:owner===0?'教练':one('SELECT name FROM students WHERE id=?',owner).name,moves,students:owner===0?all('SELECT id,name FROM students ORDER BY id DESC'):[]};
+ if(route==='/api/cycle-weeks'&&!isPost)return publishedWeeks(all,owner);
+ if(route.startsWith('/api/messages/'))return messages({one,all,run},url,b,owner,isPost);
+ if(['/api/coach/ai/generate','/api/coach/cycle/generate'].includes(route)&&isPost)return coachTools({one,all,run},route,b,url,isPost,owner);
+ if(route.startsWith('/api/coach/')){
+   db.exec(isPost?'BEGIN IMMEDIATE':'BEGIN');
+   try{const result=await coachTools({one,all,run},route,b,url,isPost,owner);db.exec('COMMIT');return result}
+   catch(error){db.exec('ROLLBACK');throw error}
+ }
+ if(route==='/api/me'&&!isPost)return {studentId:owner,coach:owner===0,name:owner===0?'教练':one('SELECT name FROM students WHERE id=?',owner).name,moves,students:owner===0?all('SELECT id,name FROM students ORDER BY id DESC'):[]};
  if(route==='/api/students'&&isPost){check(owner===0,'仅教练可用',403);const name=String(b.name||'').trim();check(name&&name.length<=60,'请输入学员姓名');const id=Number(run('INSERT INTO students(name) VALUES(?)',name).lastInsertRowid);return {id};}
  const sid=Number(isPost?(b.student??owner):url.searchParams.get('student')||owner);
  check(owner===0||owner===sid,'无权访问此学员',403);check(one('SELECT id FROM students WHERE id=?',sid),'学员不存在',404);
@@ -78,8 +90,8 @@ http.createServer(async(req,res)=>{try{
  if(preview&&req.method==='GET'){await serveGif(byId.get(preview[1]),dir,res);return}
  if(!u.pathname.startsWith('/api/')){const file={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}[u.pathname];check(typeof file==='string','页面不存在',404);res.setHeader('Content-Type',({'index.html':'text/html; charset=utf-8','app.js':'text/javascript','style.css':'text/css'})[file]);return res.end(fs.readFileSync(path.join(root,file)));}
  res.setHeader('Content-Type','application/json; charset=utf-8');const post=req.method==='POST';check(post||req.method==='GET','请求方式无效',405);
- let body={};if(post){check(req.headers['content-type']==='application/json','请求格式无效',415);let parts=[],size=0;for await(const chunk of req){size+=chunk.length;check(size<=65536,'请求过大',413);parts.push(chunk);}body=JSON.parse(Buffer.concat(parts).toString()||'{}');}
+ let body={};if(post){check(req.headers['content-type']==='application/json','请求格式无效',415);let parts=[],size=0;for await(const chunk of req){size+=chunk.length;check(size<=(u.pathname.startsWith('/api/coach/assessments/')?320000:65536),'请求过大',413);parts.push(chunk);}body=JSON.parse(Buffer.concat(parts).toString()||'{}');}
  const token=String(req.headers['x-studio-session']||'');
  const sessionHash=hash(token);const owner=one('SELECT owner FROM sessions WHERE token=? AND expires>?',sessionHash,Date.now())?.owner;
- res.end(JSON.stringify(api(u,body,owner,post,res)));}catch(e){res.statusCode=e.status||500;res.end(JSON.stringify({error:e.status?e.message:'请求处理失败'}));}
+ res.end(JSON.stringify(await api(u,body,owner,post,res)));}catch(e){res.statusCode=e.status||500;res.end(JSON.stringify({error:e.status?e.message:'请求处理失败'}));}
 }).listen(Number(process.env.PORT||4186),process.env.HOST||'127.0.0.1',()=>console.log('训练工作台已启动'));
