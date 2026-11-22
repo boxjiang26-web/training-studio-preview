@@ -1,9 +1,13 @@
+import {cycleReport} from './cycle-reports.mjs';
+import {previousReview,reviewWeeks} from './cycle-review.mjs';
 import {generateWeek} from './ai-week.mjs';
 import {randomUUID} from 'node:crypto';
 import fs from 'node:fs';
 const names=new Set(['徒手深蹲','髋部拉伸','俯卧撑','平板支撑','弹力带划船',...JSON.parse(fs.readFileSync(new URL('./catalog.json',import.meta.url),'utf8')).map(x=>x.name)]);
 export const cycleSchema=`CREATE TABLE IF NOT EXISTS training_cycles(id TEXT PRIMARY KEY,student INTEGER NOT NULL REFERENCES students(id),goal TEXT NOT NULL,start_day TEXT NOT NULL,weeks INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS cycle_weeks(cycle TEXT NOT NULL REFERENCES training_cycles(id),idx INTEGER NOT NULL,rev INTEGER NOT NULL,published INTEGER NOT NULL,days TEXT NOT NULL,PRIMARY KEY(cycle,idx));`;
+CREATE TABLE IF NOT EXISTS cycle_weeks(cycle TEXT NOT NULL REFERENCES training_cycles(id),idx INTEGER NOT NULL,rev INTEGER NOT NULL,published INTEGER NOT NULL,days TEXT NOT NULL,PRIMARY KEY(cycle,idx));
+CREATE TABLE IF NOT EXISTS cycle_reports(cycle TEXT PRIMARY KEY REFERENCES training_cycles(id),content TEXT NOT NULL,version TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS cycle_reviews(cycle TEXT PRIMARY KEY REFERENCES training_cycles(id),note TEXT NOT NULL,rev INTEGER NOT NULL);`;
 function check(ok,msg,status=400){if(!ok)throw Object.assign(Error(msg),{status})}
 export function shift(day,n){const d=new Date(day);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export async function publishedWeeks(all,owner){
@@ -21,6 +25,17 @@ export async function cycles({one,all,run},action,b){
  }
  if(action==='list')return {cycles:await all('SELECT * FROM training_cycles WHERE student=? ORDER BY start_day DESC,id',student)};
  const c=await one('SELECT * FROM training_cycles WHERE student=? AND id=?',student,b.cycle||'');check(c,'周期不存在',404);
+ if(['preview-report','send-report'].includes(action))return cycleReport({one,all,run},action,c,person,b);
+ if(action==='review'){
+   const row=await one('SELECT note,rev FROM cycle_reviews WHERE cycle=?',c.id);
+   return {weeks:await reviewWeeks(all,c),note:row?.note||'',rev:row?.rev||0};
+ }
+ if(action==='confirm-review'){
+   check(typeof b.note==='string'&&b.note.length<=1200&&Number.isInteger(b.reviewRev),'请检查复盘内容');
+   const note=b.note.trim(),args=[note,c.id,b.reviewRev];
+   const saved=b.reviewRev?await one('UPDATE cycle_reviews SET note=?,rev=rev+1 WHERE cycle=? AND rev=? RETURNING note,rev',...args):await one('INSERT INTO cycle_reviews(cycle,note,rev) VALUES(?,?,1) ON CONFLICT(cycle) DO NOTHING RETURNING note,rev',c.id,note);
+   check(saved,'结论已更新，请重新打开周期',409);return saved;
+ }
  check(Number.isInteger(b.idx)&&b.idx>=0&&b.idx<c.weeks,'周次无效');
  const get=i=>one('SELECT rev,published,days FROM cycle_weeks WHERE cycle=? AND idx=?',c.id,i);
  const row=await get(b.idx);
@@ -33,7 +48,9 @@ export async function cycles({one,all,run},action,b){
   const decode=v=>typeof v==='string'?JSON.parse(v):v;
   const previous=sessions.map(x=>({day:x.day,plan:decode(x.items).map(({name,sets,qty,unit})=>({name,sets,qty,unit})),planned:decode(x.items).reduce((n,a)=>n+a.sets,0),completed:x.sets==null?null:decode(x.sets).flat().filter(Boolean).length,rpe:x.rpe,note:(x.note||'').replaceAll(person.name,'学员').slice(0,240)}));
   const memories=(await all("SELECT note FROM training_memory WHERE student=? AND status='已接受' ORDER BY created,id",student)).map(x=>x.note.replaceAll(person.name,'学员'));
-  const context={cycleWeek:b.idx+1,cycleLength:c.weeks,previousStart:first,previousEnd:last,previous,memories};
+  const review=await previousReview(all,c);
+  if(review){review.note=review.note.replaceAll(person.name,'学员');review.goal=review.goal.replaceAll(person.name,'学员')}
+  const context={previousReview:review,cycleWeek:b.idx+1,cycleLength:c.weeks,previousStart:first,previousEnd:last,previous,memories};
   const result=await generateWeek(c.goal,person,week,context);
   const snapshot={days:result.days,reference:{reason:result.reason.slice(0,1200),...context}};
   const json=JSON.stringify(snapshot);

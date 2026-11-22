@@ -1,10 +1,11 @@
+import {roleTag} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
 const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
 async function request(path,body,token=''){const r=await fetch(base+'/api/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-studio-session':token},body:body&&JSON.stringify(body)});return {status:r.status,data:await r.json()}}
 const coach=(await request('trial',{})).data.token;
 const students=(await request('me',null,coach)).data.students;
-const pair=['甲','乙'].map(prefix=>students.find(s=>s.name.startsWith('报告验收'+prefix)));
+const pair=['甲','乙'].map(prefix=>students.find(s=>s.name.endsWith(roleTag('报告',prefix))));
 const browser=await chromium.launch({channel:'chrome'});
 try{
  for(const [i,s] of pair.entries()){

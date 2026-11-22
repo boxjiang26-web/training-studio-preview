@@ -1,10 +1,12 @@
+import {testRoster} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
 const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
+const testName=await testRoster(base);
 const browser=await chromium.launch({channel:'chrome'});
 try{
  const p=await browser.newPage();await p.goto(base);
- await p.getByLabel('新学员姓名').fill('动作库测试 '+Date.now().toString(36));
+ await p.getByLabel('新学员姓名').fill(testName('动作库','甲'));
  await p.getByRole('button',{name:'建立档案'}).click();
  await p.getByLabel('新学员姓名').filter({visible:true}).waitFor();
  await p.waitForFunction(()=>document.querySelector('input[required]')?.value==='');

@@ -1,9 +1,11 @@
+import {testRoster} from './test-roster.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
+const testName=await testRoster(base);
 async function api(route,token,body){const res=await fetch(base+'/api/'+route,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-studio-session':token||''},body:body&&JSON.stringify(body)});const result=await res.json();assert.equal(res.status,200,JSON.stringify(result));return result}
-const coach=(await api('trial','',{})).token, names=['甲','乙'].map(n=>'报告验收'+n+Date.now().toString(36)),ids=[];
+const coach=(await api('trial','',{})).token, names=['甲','乙'].map(n=>testName('报告',n)),ids=[];
 for(const [i,name] of names.entries()){
  const {id}=await api('students',coach,{name});ids.push(id);const token=(await api('trial','',{student:id})).token;
  for(const day of ['2026-11-01','2026-11-15']){

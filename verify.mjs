@@ -1,12 +1,13 @@
+import {testRoster} from './test-roster.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const base='http://127.0.0.1:4186', browser=await chromium.launch({channel:'chrome',headless:true});
-const stamp=Date.now().toString(36);
+const testName=await testRoster(base);
 async function openView(url,mobile=false){const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1280,height:900},isMobile:mobile,hasTouch:mobile});const p=await context.newPage();p.on('request',r=>{const t=r.headers()['x-studio-session'];if(t)p.trialToken=t});await p.goto(url);await p.getByRole('heading',{name:mobile?'我的训练':'训练编排',exact:true}).waitFor();return p;}
 try{
 const c=await openView(base);const students=[];
-for(const label of ['A','B']){const name='测试学员 '+label+' · '+stamp;await c.getByLabel('新学员姓名').fill(name);await c.getByRole('button',{name:'建立档案'}).click();await c.waitForFunction(n=>document.querySelector('select[aria-label="当前学员"]')?.selectedOptions[0]?.textContent===n,name);const link=await c.getByText('打开学员视图').getAttribute('href');students.push({name,id:await c.getByLabel('当前学员').inputValue(),p:await openView(base+link,true)});}
+for(const label of ['A','B']){const name=testName('训练',label==='A'?'甲':'乙');await c.getByLabel('新学员姓名').fill(name);await c.getByRole('button',{name:'建立档案'}).click();await c.waitForFunction(n=>document.querySelector('select[aria-label="当前学员"]')?.selectedOptions[0]?.textContent===n,name);const link=await c.getByText('打开学员视图').getAttribute('href');students.push({name,id:await c.getByLabel('当前学员').inputValue(),p:await openView(base+link,true)});}
 const [a,b]=students;const select=async(s)=>{await c.getByLabel('当前学员').selectOption(s.id);await c.getByRole('button',{name:'添加动作'}).waitFor()};
 const save=async()=>{await c.getByRole('button',{name:'保存草稿'}).click();await c.getByText('已保存草稿',{exact:true}).waitFor()};
 const publish=async()=>{await c.getByRole('button',{name:'发布计划'}).click();await c.getByText('计划已发布',{exact:true}).waitFor()};

@@ -1,10 +1,12 @@
+import {testRoster} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
 const url=process.env.STUDIO_URL||'http://127.0.0.1:4186';
+const testName=await testRoster(url);
 const browser=await chromium.launch({channel:'chrome'});
 try{
   const page=await browser.newPage();await page.goto(url);
-  const names=['甲','乙'].map(n=>'测评验收'+n+Date.now().toString(36)),ids=[];
+  const names=['甲','乙'].map(n=>testName('测评',n)),ids=[];
   for(const name of names){
     await page.getByLabel('新学员姓名').fill(name);await page.getByRole('button',{name:'建立档案'}).click();
     await page.waitForFunction(n=>document.querySelector('[aria-label="当前学员"]')?.selectedOptions[0]?.textContent===n,name);

@@ -1,12 +1,14 @@
+import {testRoster} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
 const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
+const testName=await testRoster(base);
 async function api(path,token,body){const r=await fetch(base+'/api/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-studio-session':token},body:body&&JSON.stringify(body)});return {status:r.status,data:await r.json()}}
-const coach=(await api('trial','',{})).data.token,stamp=Date.now().toString(36),pair=[];
+const coach=(await api('trial','',{})).data.token,pair=[];
 const browser=await chromium.launch({channel:'chrome'});
 try{
  const c=await browser.newPage();for(const part of ['甲','乙']){
- const name='沟通验收'+part+stamp;const {id}=(await api('students',coach,{name})).data;const p=await browser.newPage({viewport:{width:390,height:844},isMobile:true});
+ const name=testName('沟通',part);const {id}=(await api('students',coach,{name})).data;const p=await browser.newPage({viewport:{width:390,height:844},isMobile:true});
  await p.goto(base+'/?student='+id);pair.push({id,name,p,token:(await api('trial','',{student:id})).data.token});
  }
  await c.goto(base);

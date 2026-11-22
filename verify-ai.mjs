@@ -1,3 +1,4 @@
+import {roleTag} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
 const base='http://127.0.0.1:4186';
@@ -5,7 +6,7 @@ async function api(path,token,body){const res=await fetch(base+'/api/'+path,{met
 const coach=(await api('trial','',{})).token,me=await api('me',coach);
 const browser=await chromium.launch({channel:'chrome'});
 try{
- const learners=['甲','乙'].map(k=>me.students.find(s=>s.name.startsWith('报告验收'+k)));
+ const learners=['甲','乙'].map(k=>me.students.find(s=>s.name.endsWith(roleTag('报告',k))));
  await Promise.all(learners.map(async(s,i)=>{
  const p=await browser.newPage();await p.goto(base);await p.getByLabel('当前学员').selectOption(String(s.id));await p.getByRole('button',{name:'AI 辅助编排'}).click();
  const dlg=p.getByRole('dialog',{name:'AI 周计划'});let week='2026-11-23';while((await api('coach/ai/load',coach,{student:s.id,week})).draft?.published){const d=new Date(week);d.setUTCDate(d.getUTCDate()+7);week=d.toISOString().slice(0,10)}

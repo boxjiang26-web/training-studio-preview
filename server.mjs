@@ -1,3 +1,4 @@
+import {studentReports} from './cycle-reports.mjs';
 import {publishedWeeks} from './cycles.mjs';
 import {messageSchema,messages} from './messages.mjs';
 import {coachSchema,coachTools} from './coach-tools.mjs';
@@ -37,6 +38,7 @@ async function api(url,b,owner,isPost,res){
  run('INSERT INTO sessions VALUES(?,?,?)',hash(token),id,Date.now()+7*86400000);
  return {token};}
  check(owner!==undefined,'请刷新试验页面',401);
+ if(route==='/api/cycle-reports'&&!isPost)return studentReports(all,owner);
  if(route==='/api/cycle-weeks'&&!isPost)return publishedWeeks(all,owner);
  if(route.startsWith('/api/messages/'))return messages({one,all,run},url,b,owner,isPost);
  if(['/api/coach/ai/generate','/api/coach/cycle/generate'].includes(route)&&isPost)return coachTools({one,all,run},route,b,url,isPost,owner);

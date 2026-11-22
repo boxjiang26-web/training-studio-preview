@@ -1,13 +1,15 @@
+import {testRoster} from './test-roster.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
+const testName=await testRoster(base);
 const browser=await chromium.launch({channel:'chrome'});
 try{
  const coach=await browser.newPage();await coach.goto(base);
  const label=Date.now().toString(36), students=[];
  for(const part of ['外','甲','乙']){
-   const name='团队验收'+part+label;
+   const name=testName('团队',part);
    await coach.getByLabel('新学员姓名').fill(name);await coach.getByRole('button',{name:'建立档案'}).click();
    await coach.waitForFunction(n=>document.querySelector('select[aria-label="当前学员"]')?.selectedOptions[0]?.textContent===n,name);
    students.push({name,id:await coach.getByLabel('当前学员').inputValue()});

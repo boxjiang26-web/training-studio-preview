@@ -1,12 +1,14 @@
+import {testRoster} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
 const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
+const testName=await testRoster(base);
 async function request(path,token,body){const r=await fetch(base+'/api/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-studio-session':token},body:body&&JSON.stringify(body)});return {status:r.status,data:await r.json()}}
-const coach=(await request('trial','',{})).data.token, stamp=Date.now().toString(36);
+const coach=(await request('trial','',{})).data.token;
 const browser=await chromium.launch({channel:'chrome'}), pair=[];
 try{
  for(const [i,label] of ['甲','乙'].entries()){
- const name='周期验收'+label+stamp,id=(await request('students',coach,{name})).data.id;
+ const name=testName('周期',label),id=(await request('students',coach,{name})).data.id;
  const token=(await request('trial','',{student:id})).data.token;pair.push({id,token});
  const c=await browser.newPage();await c.goto(base);await c.getByLabel('当前学员').selectOption(String(id));await c.getByRole('button',{name:'多周训练周期'}).click();
  const d=c.getByRole('dialog',{name:'多周训练周期'}),goal=i?'核心稳定':'下肢控制',move=i?'平板支撑':'徒手深蹲',qty=i?30:10;

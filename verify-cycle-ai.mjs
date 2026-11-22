@@ -1,12 +1,14 @@
+import {testRoster} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
 const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
+const testName=await testRoster(base);
 async function req(path,body,token=''){return fetch(base+'/api/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-studio-session':token},body:body&&JSON.stringify(body)})}
 async function api(path,body,token){const r=await req(path,body,token);assert.ok(r.ok,path+' '+r.status);return r.json()}
-const coach=(await api('trial',{})).token,stamp=Date.now().toString(36),pair=[];
+const coach=(await api('trial',{})).token,pair=[];
 const start='2026-11-16',week='2026-11-23';
 for(const [i,k] of ['甲','乙'].entries()){
- const name='周期AI验收'+k+stamp,{id:student}=await api('students',{name},coach),token=(await api('trial',{student})).token;
+ const name=testName('周期AI',k),{id:student}=await api('students',{name},coach),token=(await api('trial',{student})).token;
  const goal=i?'加强核心耐力':'协调下肢发力',note=i?'本周先复核核心训练动作':'优先复核下肢动作质量';
  const {id:cycle}=await api('coach/cycle/create',{student,goal,start,weeks:3},coach);
  const days=Array.from({length:7},()=>[]);days[0]=[{name:i?'平板支撑':'徒手深蹲',sets:3,qty:i?30:10,unit:i?'秒':'次'}];days[2]=days[0];
@@ -15,7 +17,7 @@ for(const [i,k] of ['甲','乙'].entries()){
  await api('feedback',{day:start,plan:plan.id,sets:[[true,!!i,!!i]],rpe:i?5:8,note:'测试反馈 '+k},token);
  const {rows}=await api('coach/memory/generate',{student},coach);
  for(const [j,r] of rows.entries())await api('coach/memory/review',{student,id:r.id,rev:r.rev,note:j?'拒绝的建议'+k:note,status:j?'已拒绝':'已接受'},coach);
- pair.push({student,cycle,token,goal,note});
+ pair.push({name,student,cycle,token,goal,note});
 }
 const browser=await chromium.launch({channel:'chrome'});
 try{await Promise.all(pair.map(async(s,i)=>{
@@ -32,5 +34,5 @@ try{await Promise.all(pair.map(async(s,i)=>{
  assert.equal((await api('day?day='+day,null,s.token)).plan.items[0].qty,14+i);
  assert.equal((await req('day?student='+other.student+'&day='+day,null,s.token)).status,403);
  assert.equal((await req('coach/cycle/generate',{student:s.student,cycle:other.cycle,idx:1,rev:0},coach)).status,404);
- console.log('PASS',s.goal,ctx.previous[0].completed+'/3','RPE',ctx.previous[0].rpe,'one accepted memory, own plan, manual edit, review before publication');
+ console.log('PASS',s.name,s.goal,ctx.previous[0].completed+'/3','RPE',ctx.previous[0].rpe,'one accepted memory, own plan, manual edit, review before publication');
 }));}finally{await browser.close()}

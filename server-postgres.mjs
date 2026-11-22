@@ -1,3 +1,4 @@
+import {studentReports} from './cycle-reports.mjs';
 import {publishedWeeks} from './cycles.mjs';
 import {messageSchema,messages} from './messages.mjs';
 import {coachSchema,coachTools} from './coach-tools.mjs';
@@ -43,6 +44,7 @@ async function api(url, body, owner, isPost) {
     return { token };
   }
   check(owner !== undefined, '请刷新试验页面', 401);
+ if(route==='/api/cycle-reports'&&!isPost)return studentReports(all,owner);
  if(route==='/api/cycle-weeks'&&!isPost)return publishedWeeks(all,owner);
  if(route.startsWith('/api/messages/'))return messages({one,all,run},url,body,owner,isPost);
  if(['/api/coach/ai/generate','/api/coach/cycle/generate'].includes(route)&&isPost)return coachTools({one,all,run},route,body,url,isPost,owner);
