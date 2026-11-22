@@ -26,7 +26,7 @@ catalog.json 保存了当日 ReadyNex 网页公开展示的 648 条动作元数�
 
 catalog.json 是动作目录的共同来源。改动作后提交这个文件，部署时前端和服务端从同一版本构建。训练日、发布记录、学员反馈与 GIF 缓存保存在共享预览服务的 DATA_DIR。开发电脑各自的 SQLite 文件只用于本地测试。
 
-仓库管理员在 Render Dashboard 新建 Blueprint，授权读取本仓库并选择 main。render.yaml 配置单个 Docker 服务、自动部署和 1 GB 持久化磁盘。Starter 实例与磁盘会收费，请在创建资源页面核对费用。初次部署使用空数据库。部署成功后把服务的 HTTPS 地址发给朋友，站点入口用户名为 studio，口令从 Render 的 PREVIEW_PASSWORD 环境变量读取并私下分享。进站后依然可以切换两种试验身份。
+仓库管理员在 Render Dashboard 新建 Blueprint，授权读取本仓库并选择 main。render.yaml 配置免费 Docker Web 服务和免费 PostgreSQL。免费数据库适合试验，Render 当前限制是创建后 30 天到期。初次部署使用空数据库。部署成功后把服务的 HTTPS 地址发给朋友，站点入口用户名为 studio，口令从 Render 的 PREVIEW_PASSWORD 环境变量读取并私下分享。进站后依然可以切换两种试验身份。
 
 验收时先确认公网首页未认证返回 401、/healthz 返回 ok。两台设备登录同一站点，分别发布和读回一条测试计划。合并一次动作目录变更后，等 Render 显示对应提交上线，再刷新确认目录更新、原训练记录仍在。朋友需要自己的 GitHub 仓库写权限；向仓库 Settings → Collaborators 添加对方的 GitHub 用户名即可。
 
