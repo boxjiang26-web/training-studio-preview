@@ -8,8 +8,10 @@ try{
   const page=await browser.newPage();await page.goto(url);
   const names=['甲','乙'].map(n=>testName('测评',n)),ids=[];
   for(const name of names){
+    const display=name.replace(/（[^（）]+测试·(?:晨练|晚练|组外)）$/,'');
+    if(!(await page.getByLabel('新学员姓名').isVisible()))await page.getByText('新建学员档案',{exact:true}).click();
     await page.getByLabel('新学员姓名').fill(name);await page.getByRole('button',{name:'建立档案'}).click();
-    await page.waitForFunction(n=>document.querySelector('[aria-label="当前学员"]')?.selectedOptions[0]?.textContent===n,name);
+    await page.waitForFunction(n=>document.querySelector('[aria-label="当前学员"]')?.selectedOptions[0]?.textContent?.startsWith(n),display);
     ids.push(await page.getByLabel('当前学员').inputValue());
   }
   const header='学员姓名,测评日期,测评项目,成绩,单位';

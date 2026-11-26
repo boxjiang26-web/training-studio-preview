@@ -6,6 +6,7 @@ const testName=await testRoster(base);
 const browser=await chromium.launch({channel:'chrome'});
 try{
  const p=await browser.newPage();await p.goto(base);
+ await p.getByText('新建学员档案',{exact:true}).click();
  await p.getByLabel('新学员姓名').fill(testName('动作库','甲'));
  await p.getByRole('button',{name:'建立档案'}).click();
  await p.getByLabel('新学员姓名').filter({visible:true}).waitFor();

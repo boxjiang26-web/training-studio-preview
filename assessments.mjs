@@ -25,11 +25,25 @@ function cleanDate(value){
   const date=m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
   return new Date(date).toJSON()?.slice(0,10)===date?date:'';
 }
-export async function assessments({all,one},route,body,url,post){
+export async function assessments({all,one,run},route,body,url,post){
   if(route==='/api/coach/assessments/history'&&!post){
     const student=Number(url.searchParams.get('student'));
     if(!await one('SELECT id FROM students WHERE id=?',student))reject('学员不存在',404);
     return {rows:await all('SELECT day,metric,unit,score FROM assessments WHERE student=? ORDER BY metric,unit,day',student)};
+  }
+  if(route==='/api/coach/assessments/update'&&post){
+    const student=Number(body.student),day=cleanDate(String(body.day||'')),metric=String(body.metric||'').trim(),unit=String(body.unit??'').trim(),score=Number(body.score);
+    if(!day||!metric||metric.length>80||unit.length>24||!Number.isFinite(score)||Math.abs(score)>1e12)reject('日期、项目、单位或成绩无效');
+    const updated=await one('UPDATE assessments SET score=? WHERE student=? AND metric=? AND unit=? AND day=? RETURNING student',score,student,metric,unit,day);
+    if(!updated)reject('测评记录不存在',404);
+    return {updated:true,score};
+  }
+  if(route==='/api/coach/assessments/delete'&&post){
+    const student=Number(body.student),day=cleanDate(String(body.day||'')),metric=String(body.metric||'').trim(),unit=String(body.unit??'').trim();
+    if(!day||!metric)reject('测评标识无效');
+    const deleted=await one('DELETE FROM assessments WHERE student=? AND metric=? AND unit=? AND day=? RETURNING student',student,metric,unit,day);
+    if(!deleted)reject('测评记录不存在',404);
+    return {deleted:true};
   }
   const commit=route==='/api/coach/assessments/confirm';
   if(!post||(!commit&&route!=='/api/coach/assessments/preview'))reject('页面不存在',404);

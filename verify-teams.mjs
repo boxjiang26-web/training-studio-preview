@@ -10,8 +10,10 @@ try{
  const label=Date.now().toString(36), students=[];
  for(const part of ['外','甲','乙']){
    const name=testName('团队',part);
+   const display=name.replace(/（[^（）]+测试·(?:晨练|晚练|组外)）$/,'');
+   if(!(await coach.getByLabel('新学员姓名').isVisible()))await coach.getByText('新建学员档案',{exact:true}).click();
    await coach.getByLabel('新学员姓名').fill(name);await coach.getByRole('button',{name:'建立档案'}).click();
-   await coach.waitForFunction(n=>document.querySelector('select[aria-label="当前学员"]')?.selectedOptions[0]?.textContent===n,name);
+   await coach.waitForFunction(n=>document.querySelector('select[aria-label="当前学员"]')?.selectedOptions[0]?.textContent?.startsWith(n),display);
    students.push({name,id:await coach.getByLabel('当前学员').inputValue()});
  }
  const target=await coach.getByLabel('训练日期').inputValue();

@@ -12,6 +12,15 @@
   "private": "true",
   "scripts": {
     "build": "esbuild app.tsx --bundle --outfile=app.js --minify",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "typecheck": "tsc --noEmit",
+    "verify:phase0": "node verify-phase0.mjs",
+    "verify:all": "node verify-all.mjs",
+    "verify:ai": "node verify-all.mjs --include-ai"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
   }
 }

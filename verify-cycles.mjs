@@ -30,4 +30,58 @@ try{
  }
  for(const [i,s] of pair.entries()){assert.equal((await request('day?day=2026-11-23&student='+pair[1-i].id,s.token)).status,403);assert.equal((await request('coach/cycle/list',s.token,{student:pair[1-i].id})).status,403)}
  console.log('PASS two student scopes, week 3 unpublished, mobile week navigation');
+
+ // TASK-003: custom exercise + structured strength fields + load-based weekly progression.
+ const customName='周期前蹲-'+Date.now().toString(36);
+ assert.equal((await request('coach/exercises',coach,{name:customName,category:'lower_strength',muscles:['股四头肌'],equipment:['杠铃']})).status,200);
+ const lifterName=testName('周期力量','甲');
+ const lifterId=(await request('students',coach,{name:lifterName})).data.id;
+ const lifterToken=(await request('trial','',{student:lifterId})).data.token;
+ const c2=await browser.newPage();await c2.goto(base);
+ await c2.getByLabel('当前学员',{exact:true}).selectOption(String(lifterId));
+ await c2.getByRole('button',{name:'多周训练周期'}).click();
+ const d2=c2.getByRole('dialog',{name:'多周训练周期'});
+ await d2.getByLabel('周期目标').fill('力量递进测试');
+ await d2.getByLabel('开始周一').fill('2026-12-14');
+ await d2.getByLabel('周期周数').fill('2');
+ await d2.getByRole('button',{name:'建立周期'}).click();
+ const mon2=d2.locator('article').first();
+ await mon2.getByRole('button',{name:'添加动作'}).click();
+ await mon2.getByLabel('动作',{exact:true}).fill(customName);
+ await mon2.getByLabel('组数',{exact:true}).fill('4');
+ await mon2.getByLabel('每组',{exact:true}).fill('5');
+ await mon2.getByLabel('负荷类型').selectOption('kg');
+ await mon2.getByLabel('负荷',{exact:true}).fill('100');
+ await mon2.getByLabel('目标 RPE').fill('8');
+ await mon2.getByLabel('间歇(秒)').fill('150');
+ await mon2.getByLabel('节奏 Tempo').fill('3-1-1-0');
+ await mon2.getByLabel('提示备注').fill('稳住躯干');
+ await d2.getByRole('button',{name:'保存周草稿'}).click();await d2.getByText('周草稿已保存').waitFor();
+ await d2.getByRole('button',{name:'确认发布本周'}).click();await d2.getByText('本周已发布').waitFor();
+
+ const w1Day=(await request('day?day=2026-12-14',lifterToken)).data;
+ assert.equal(w1Day.plan.items[0].name,customName);
+ assert.equal(w1Day.plan.items[0].load,100);
+ assert.equal(w1Day.plan.items[0].loadUnit,'kg');
+ assert.equal(w1Day.plan.items[0].targetRpe,8);
+ assert.equal(w1Day.plan.items[0].restSec,150);
+ assert.equal(w1Day.plan.items[0].tempo,'3-1-1-0');
+ assert.equal(w1Day.plan.items[0].cue,'稳住躯干');
+
+ await d2.getByLabel('编排周次').selectOption('1');
+ await d2.getByLabel('调整目标').selectOption('load');
+ await d2.getByLabel('每组次数或时长比例 (%)').fill('105');
+ await d2.getByRole('button',{name:'复用上一周'}).click();
+ await d2.getByText('已复制，可继续逐日调整').waitFor();
+ assert.equal(await mon2.getByLabel('负荷',{exact:true}).inputValue(),'105');
+ assert.equal(await mon2.getByLabel('每组',{exact:true}).inputValue(),'5');
+ await d2.getByRole('button',{name:'确认发布本周'}).click();await d2.getByText('本周已发布').waitFor();
+
+ const p2=await browser.newPage({viewport:{width:390,height:844},isMobile:true});
+ await p2.goto(base+'/?student='+lifterId);
+ await p2.getByLabel('已发布周期周').selectOption('2026-12-21');
+ await p2.getByText('105 kg · 目标 RPE 8 · 间歇 150 秒 · 节奏 3-1-1-0').waitFor();
+ await p2.getByText('教练提示：稳住躯干').waitFor();
+ await c2.close();await p2.close();
+ console.log('PASS cycle strength fields, custom exercise, and 100 kg -> 105 kg load progression');
 }finally{await browser.close()}

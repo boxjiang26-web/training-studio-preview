@@ -2,8 +2,10 @@ import React,{useEffect,useRef,useState} from 'react';
 
 const sample='\ufeff学员姓名,测评日期,测评项目,成绩,单位\r\n示例学员,2026-11-01,立定跳远,210,厘米\r\n示例学员,2026-11-15,立定跳远,218,厘米\r\n';
 type Result={day:string,metric:string,score:number,unit:string};
-function History({rows}:{rows:Result[]}){
+function History({rows,onUpdate,onDelete}:{rows:Result[],onUpdate:(r:Result,score:number)=>Promise<void>,onDelete:(r:Result)=>Promise<void>}){
   const groups=new Map<string,Result[]>();
+  const [editing,setEditing]=useState<string>('');
+  const [draftScore,setDraftScore]=useState<string>('');
   for(const r of rows){
     const key=JSON.stringify([r.metric,r.unit]);
     if(!groups.has(key))groups.set(key,[]);
@@ -11,9 +13,11 @@ function History({rows}:{rows:Result[]}){
   }
   if(!rows.length)return <p>这名学员还没有测评成绩。</p>;
   return <div className="assessment-history">{Array.from(groups,([key,series])=><div key={key}><h4>{series[0].metric}{series[0].unit?'（'+series[0].unit+'）':''}</h4>
-    <table><thead><tr><th>测评日期</th><th>成绩</th><th>较上次</th></tr></thead><tbody>{series.map((r,i)=>{
+    <table><thead><tr><th>测评日期</th><th>成绩</th><th>较上次</th><th>操作</th></tr></thead><tbody>{series.map((r,i)=>{
+      const rowKey=JSON.stringify([r.day,r.metric,r.unit]);
       const delta=i?Number((r.score-series[i-1].score).toPrecision(10)):null;
-      return <tr key={r.day}><td>{r.day}</td><td>{r.score}</td><td>{delta===null?'首次':delta===0?'持平':(delta>0?'+':'')+delta}</td></tr>
+      const isEditing=editing===rowKey;
+      return <tr key={r.day}><td>{r.day}</td><td>{isEditing?<input aria-label={'修改成绩 '+r.day} type="number" step="any" value={draftScore} onChange={e=>setDraftScore(e.target.value)}/>:r.score}</td><td>{delta===null?'首次':delta===0?'持平':(delta>0?'+':'')+delta}</td><td>{isEditing?<><button type="button" onClick={async()=>{await onUpdate(r,Number(draftScore));setEditing('')}}>保存成绩</button><button type="button" className="alt" onClick={()=>setEditing('')}>取消</button></>:<><button type="button" className="alt" onClick={()=>{setEditing(rowKey);setDraftScore(String(r.score))}}>修正</button><button type="button" className="alt" onClick={()=>onDelete(r)}>删除</button></>}</td></tr>
     }).reverse()}</tbody></table></div>)}</div>;
 }
 function ImportCsv({api,students,onClose,onSaved}){
@@ -61,6 +65,6 @@ export function AssessmentPanel({api,sid,students}){
   },[history,sid,version]);
   return <div className="assessment-pane"><h3>体能测评</h3><button className="alt" onClick={()=>toggle(true)}>导入测评 CSV</button>
     {!!sid&&<button className="alt" aria-expanded={history} onClick={()=>expand(!history)}>历次测评</button>}
-    {history&&!!sid&&(err?<aside>{err}</aside>:record?.sid===sid?<History rows={record.rows}/>:<p>正在读取…</p>)}
+    {history&&!!sid&&(err?<aside>{err}</aside>:record?.sid===sid?<History rows={record.rows} onUpdate={async(r,score)=>{try{setErr('');await api('coach/assessments/update',{student:sid,day:r.day,metric:r.metric,unit:r.unit,score});refresh(v=>v+1)}catch(e){setErr((e as Error).message)}}} onDelete={async(r)=>{try{setErr('');await api('coach/assessments/delete',{student:sid,day:r.day,metric:r.metric,unit:r.unit});refresh(v=>v+1)}catch(e){setErr((e as Error).message)}}}/>:<p>正在读取…</p>)}
     {open&&<ImportCsv api={api} students={students} onClose={()=>toggle(false)} onSaved={()=>{refresh(v=>v+1);expand(true)}}/>}</div>
 }

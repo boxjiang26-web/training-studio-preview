@@ -1,7 +1,7 @@
 import {roleTag} from './test-roster.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from '@playwright/test';
-const base='http://127.0.0.1:4186';
+const base=process.env.STUDIO_URL||'http://127.0.0.1:4186';
 async function api(path,token,body){const res=await fetch(base+'/api/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-studio-session':token},body:body&&JSON.stringify(body)});return res.json()}
 const coach=(await api('trial','',{})).token,me=await api('me',coach);
 const browser=await chromium.launch({channel:'chrome'});

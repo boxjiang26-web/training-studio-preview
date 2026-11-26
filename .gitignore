@@ -7,3 +7,4 @@ acceptance*.json
 .env*
 *.sqlite*
 *.log
+.tmp-verify-*/
